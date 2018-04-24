@@ -1,0 +1,287 @@
+﻿/* 
+PersonCentredSoftware Limited 
+*/
+
+.pcs-component {
+    display: none;
+}
+
+.pcs-component.pcs-content {
+    display: inherit;
+}
+
+.pcs-hidden {
+    display: none!important;
+}
+/* Errors and validation */
+.pcs-component .pcs-errors {
+    font-weight: bold;
+    color: red;
+}
+.pcs-error {
+    border-color: red!important;
+    color: red;
+}
+
+.pcs-selected {
+    font-weight: bold!important;
+}
+
+/* Form styling */
+.pcs-form-group {
+    margin: 8px 0;
+}
+
+.pcs-form-group .pcs-form-item {
+    margin: 5px 15px;
+    max-width: 500px;
+}
+
+.pcs-form-item > input:not([type='checkbox']), .pcs-form-item > select, .pcs-form-item > textarea {
+    display: block;
+    width: 100%;
+    color: #555;
+    background-color: #fff;
+    background-image: none;
+    border: 1px solid #ccc;
+    border-radius: 2px;
+    -moz-transition: border-color ease-in-out .15s,-webkit-box-shadow ease-in-out .15s;
+    -ms-transition: border-color ease-in-out .15s,-webkit-box-shadow ease-in-out .15s;
+    -webkit-transition: border-color ease-in-out .15s,-webkit-box-shadow ease-in-out .15s;
+    -o-transition: border-color ease-in-out .15s,box-shadow ease-in-out .15s;
+    transition: border-color ease-in-out .15s,box-shadow ease-in-out .15s;
+}
+
+.pcs-form-item > textarea {
+    height: 4em;
+}
+
+.pcs-form-item > input[type=checkbox] {
+    display: block;
+}
+
+.pcs-button {
+    display: inline-block;
+    padding: 6px 12px;
+    margin-bottom: 0;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.42857143;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: middle;
+    -ms-touch-action: manipulation;
+    touch-action: manipulation;
+    cursor: pointer;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    background-image: none;
+    border: 1px solid #efefef;
+    border-radius: 2px;
+    color: #555;
+    background-color: #fff;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.15),0 1px 1px rgba(0,0,0,.075);
+    text-shadow: 0 1px 0 #fff;
+    text-decoration: none;
+}
+
+    .pcs-button:hover {
+        text-decoration: none;
+        background-color: #EEE;
+    }
+
+.pcs-row {
+    clear: both;
+}
+
+.pcs-left {
+    float: left;
+}
+
+.pcs-half {
+    width: 49%;
+}
+
+.pcs-header {
+    font-weight: bold;
+}
+
+.pcs-loading {
+    background: url('https://care.personcentredsoftware.com/MCM/Images/loading.gif') center no-repeat;
+    min-height: 30px;
+}
+
+/* Login form component */
+@media (min-width: 768px) {
+    .pcs-component.pcs-Login {
+        float: right;
+        display: inline-block;
+    }
+
+    .pcs-component.pcs-Login .pcs-form-item {
+        display: inline-block;
+        vertical-align: bottom;
+    }
+
+    .pcs-form-item.pcs-username {
+        vertical-align: middle;
+    }
+}
+
+/* CareSummary component */
+.pcs-component.pcs-CareSummary tr:nth-child(odd) {
+    background: #f9f9f9;
+}
+
+.pcs-component.pcs-CareSummary tr:nth-child(even) {
+    background: #fff;
+}
+
+.pcs-component.pcs-CareSummary td, .pcs-component.pcs-CareSummary th {
+    padding: 0.4em 0.6em;
+}
+
+.pcs-component.pcs-CareSummary table {
+    width: 100%;
+}
+
+/* Daily Plan/Care Component*/
+.pcs-daily-plan-icon > img {
+    height: 36px;
+    width: 36px;
+}
+
+.pcs-daily-care-detail > img {
+    height: 24px;
+    width: 24px;
+}
+
+.pcs-daily-plan-icon, .pcs-daily-care-spacer {
+    display: table-cell;
+    vertical-align: top;
+    padding: 0 1em;
+}
+
+.pcs-daily-plan-detail, .pcs-daily-care-detail {
+    display: table-cell;
+}
+
+.pcs-daily-plan-actions {
+    font-size: 0.9em;
+    font-style: italic;
+}
+
+.pcs-daily-plan-row {
+    width: 100%;
+}
+
+/* Portrait Component */
+.pcs-component.pcs-Portrait {
+    text-align: center;
+}
+
+    .pcs-component.pcs-Portrait img {
+        width: 100%;
+        max-width: 250px;
+    }
+
+/* Complete Care Plan Document Component*/
+.pcs-component.pcs-CompleteCarePlanDocument {
+    min-height: 600px;
+}
+
+    .pcs-component.pcs-CompleteCarePlanDocument iframe {
+        width: 100%;
+        height: 100%;
+        min-height: 600px;
+        border: none;
+    }
+/* Messenger component */
+.pcs-component.pcs-Messenger textarea {
+    width: 100%;
+}
+
+.pcs-component .pcs-message {
+    margin: 5px;
+    border: solid 2px #ccc;
+    border-radius: 12px;
+    padding: 0 15px;
+}
+
+.pcs-message.pcs-type-relative {
+    border-color: rgb(95,184,70);
+}
+
+.pcs-message.pcs-type-mcm {
+    border-color: rgb(25,149,210);
+}
+
+.pcs-component .pcs-message.pcs-type-relative {
+    margin-right: 25px;
+    text-align: left;
+}
+
+.pcs-component .pcs-message.pcs-type-mcm {
+    margin-left: 25px;
+    text-align: right;
+}
+
+.pcs-component .pcs-message > h3 {
+    font-size: 0.9em;
+    font-style: italic;
+    color: #333;
+}
+
+.pcs-component .pcs-message > p {
+    font-size: 1.5em;
+    color: #333;
+}
+
+.pcs-component .pcs-message > p::before {
+    content: "\"";
+}
+
+.pcs-component .pcs-message > p::after {
+    content: "\"";
+}
+
+
+.pcs-Messenger .pcs-filter-box {
+    display: inline;
+    margin-left: 20px;
+}
+
+.pcsMessenger-likeabutton {
+    text-decoration: none;
+    font-family: 'Lato', Helvetica, Arial, Lucida, sans-serif;
+    font-size: 10px;
+    display: inline-block;
+    padding: 2px 8px;
+    background-color: lightgreen;
+    color: ButtonText;
+    border-style: solid;
+    border-width: 2px;
+    border-color: ButtonHighlight ButtonShadow ButtonShadow ButtonHighlight;
+    text-align: center;
+    -webkit-border-radius: 6px 6px;
+    border-radius: 6px 6px;
+}
+
+    .pcsMessenger-likeabutton:active {
+        border-color: ButtonShadow ButtonHighlight ButtonHighlight ButtonShadow;
+    }
+
+/* Gallery component*/
+.pcs-message figcaption::before {
+    content: "\"";
+}
+
+.pcs-message figcaption::after {
+    content: "\"";
+}
+
+.pcs-filter-box {
+    margin-bottom: 10px;
+}
