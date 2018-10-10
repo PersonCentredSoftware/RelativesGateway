@@ -1,33 +1,20 @@
-﻿/* 
-    PersonCentredSoftware Limited
-
-    This namespace will contain all our wrapper functions
+/* 
+    Person Centred Software Limited
+    https://github.com/PersonCentredSoftware/RelativesGateway
+    Version 1.0.0
 */
 
 var PcsComponents = (function () {
 
-    var deferred = $.Deferred(); 
-    var guid;
-    var _baseURL = 'https://staticcontent.personcentredsoftware.com';
+    var deferred = $.Deferred();
+    var _providerId;
+    var _contentURL = 'https://staticcontent.personcentredsoftware.com';
+    var _baseURL = 'https://monitor.personcentredsoftware.com';
     var _providerURL = window.location + "//" + window.location.hostname;
     var passwordResetURL = _providerURL + '/Home/ResetPassword';
     var initialised = false;
 
-    // Login error codes
-    var loginErrors = {
-        pcsErr1: "Authentication error - try again?",
-        pcsErr2: "Nothing to display", // Authenticated but no permissions to see anything
-        pcsErr3: "Nothing to display",  // No relationships to this user in this care home
-        pcsErr4: "Authentication error", // Please contact PCS support
-        pcsErr5: "ProviderID not sent", // ProviderId is not sent or is invalid
-        pcsErr6: "Unrecognised originating domain", // Referer domain not in the whitelist
-        pcsErr7: "Provider not authorised to use Relatives' Gateway",  // Provider does not have access to RelativesGateway
-        pcsErr8: "Nothing to display", // Please try again in 1 hour, and if still having problems get in touch with PCS support
-    };
-
-
-    // Call ajax
-    function ajax(url, id, successCallback, errCallback, urlData) {
+    function _ajax(method, url, containerId, urlData, deferred) {
 
         var xmlhttp = new XMLHttpRequest();
         xmlhttp.withCredentials = true;
@@ -35,66 +22,147 @@ var PcsComponents = (function () {
         xmlhttp.onreadystatechange = function () {
             if (xmlhttp.readyState === 4) {
                 if (xmlhttp.status === 200) {
-                    if (successCallback === undefined)
-                        ajaxOnSuccess(id, xmlhttp.responseText);
-                    else
-                        successCallback(id, xmlhttp.responseText);
+                    deferred.resolve(containerId, xmlhttp.responseText);
+                }
+                else if (xmlhttp.status === 202) {
+                    setAccessInfoToStorage(null);
+                    deferred.resolve(containerId, xmlhttp.responseText);
                 }
                 else {
-                    if (errCallback === undefined)
-                        ajaxOnError(id);
-                    else
-                        errCallback(id);
+                    deferred.reject(containerId, xmlhttp.responseText);
                 }
             }
         };
 
-        ajaxLoading(id);
+        if (containerId)
+            _ajaxLoading(containerId);
 
-        xmlhttp.open("GET", url + '/' + guid + (urlData ? urlData : ''), true);
-        xmlhttp.send();
+        xmlhttp.open(method, url + '/' + _providerId + (method == "GET" && urlData ? '?' + _serialize(urlData) : ''), true);
+        var ticket = getTicketFromStorage();
+        if (ticket) {
+            xmlhttp.setRequestHeader("X-PCSAuth", ticket);
+        }
+
+        if (method == "POST") {
+            if (urlData && urlData["pcs_aft"])
+                xmlhttp.setRequestHeader("X-PCSAFT", urlData["pcs_aft"]);
+
+            xmlhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+            xmlhttp.send(_serialize(urlData));
+        }
+        else {
+            xmlhttp.send();
+        }
     }
 
     // Loading
-    function ajaxLoading(id) {
+    function _ajaxLoading(id) {
+        if (!id) return;
         $('#' + id).empty().addClass('pcs-loading');
     }
 
     // Handle success
-    function ajaxOnSuccess(id, content) {
+    function _ajaxOnSuccess(id, content) {
+        if (!id) return;
+
         var obj = $('#' + id);
         obj.hide().removeClass('pcs-loading').html(content).fadeIn();
         obj.find('.pcs-component').addClass('pcs-content');
     }
 
     // Handle error
-    function ajaxOnError(id) {
+    function _ajaxOnError(id, response) {
+        console.log("_ajaxOnError: " + response);
+        if (!id) return;
+
         $('#' + id).hide().removeClass('pcs-loading').html('<div class="error">Could not load component :(</div>').fadeIn().find('.pcs-component').addClass('pcs-content');
     }
 
-    // Login component onSuccess
-    function loginOnSuccess(id, content) {
-        ajaxOnSuccess(id, content);
+    function _serialize(obj) {
+        var str = [];
+        for (var p in obj)
+            if (obj.hasOwnProperty(p)) {
+                str.push(encodeURIComponent(p) + "=" + encodeURIComponent(obj[p]));
+            }
+        return str.join("&");
+    }
 
-        if (content.indexOf('name="UserName"') >= 0) {
-            expireAuthCookie();
-        } else {
-            setAuthCookie();
+    // Session/storage
+    function getAccessInfoFromStorage() {
+        var result = null;
+        var key = "CareInformationAccess";
+        try {
+            result = JSON.parse(localStorage.getItem(key));
+
+            if (result) {
+                if (!result.__Expires || isNaN(parseInt(result.__Expires)) || parseInt(result.__Expires) < new Date().valueOf()) {
+                    setAccessInfoToStorage(null);
+                    result = null;
+                }
+            }
+
+
+        } catch (e) {
+            console.log(e);
         }
+
+        return result;
+    }
+
+    function setAccessInfoToStorage(value, expiryMin) {
+        "use strict"
+        var key = "CareInformationAccess";
+
+        if (value && value.Ticket) {
+            if (value.Authenticated) 
+                localStorage.setItem("PCSTicket", value.Ticket);
+            else
+                localStorage.removeItem("PCSTicket");
+
+            delete value.Ticket;
+        }
+
+
+        if (value === null || value === undefined)
+            localStorage.removeItem(key);
+        else {
+            if (expiryMin === undefined) expiryMin = 30;
+            value.__Expires = new Date().valueOf() + 60000 * expiryMin;
+
+            localStorage.setItem(key, JSON.stringify(value));
+        }
+
+    }
+
+    // Session/storage
+    function getTicketFromStorage() {
+        var result = null;
+        var key = "PCSTicket";
+        try {
+            result = localStorage.getItem(key);
+        } catch (e) {
+            console.log(e);
+        }
+
+        return result;
+    }
+
+
+    // Login component onSuccess
+    function _loginOnSuccess(id, content) {
 
         $('#' + id).find('a.pcs-logout').bind('click', function (e) {
             e.preventDefault();
-            expireAuthCookie();
             window.location = $(this).attr('href');
         });
 
-        // Read error from the response URL
-        var hash = window.location.href.split("#")[1];
-        if (hash !== undefined) {
-            if (loginErrors[hash] !== undefined) {
-                $('#' + id).find('.pcs-errors').html(loginErrors[hash]);
-            }
-        }
+        //// Read error from the response URL
+        //var hash = window.location.href.split("#")[1];
+        //if (hash !== undefined) {
+        //    if (loginErrors[hash] !== undefined) {
+        //        $('#' + id).find('.pcs-errors').html(loginErrors[hash]);
+        //    }
+        //}
 
         // If there is a list of relatives, add on-change event to submit the page
         if (content.indexOf('</select>')) {
@@ -112,37 +180,47 @@ var PcsComponents = (function () {
             modal: true,
             width: 500,
             buttons: {
-                "Reset password": function () {
+                "Reset password": function (e) {
+                    "use strict"
 
+                    var btn = $(e.currentTarget);
+                    if (btn.attr("disabled")) return;
+
+                    btn.html("Working... Please wait");
                     var t = $(this);
                     var regex = /^([a-zA-Z0-9_.+-])+\@(([a-zA-Z0-9-])+\.)+([a-zA-Z0-9]{2,4})+$/;
                     var email = t.find('input[type=email]').val();
 
-                    if (email.length == 0 || !regex.test(email)) {
+                    if (email.length === 0 || !regex.test(email)) {
                         t.find('input[type=email]').addClass('pcs-error');
                     } else {
                         t.find('input[type=email]').removeClass('pcs-error');
                         t.find('button').attr('disabled', 'disabled');
 
-                        // Submit the reset password request.
-                        $.ajax({
-                            url: _baseURL + '/MCM/ProviderComponent/RegeneratePassword/' + guid,
-                            method: "post",
-                            data: { email: email, successReturnUrl: passwordResetURL },
-                            success: function () {
+                        (function () {
+                            "use strict";
+                            var deferred = $.Deferred();
+                            var data = { email: email, successReturnUrl: passwordResetURL, pcs_aft: $('#' + id).find("#pcs_aft").val() };
+                            _ajax("POST", _baseURL + "/MCM/ProviderComponent2/RegeneratePassword", null, data, deferred);
+                            return deferred.promise();
+                        })()
+                        .then(function (containerId, content) {
+                            "use strict"
+                            btn.html("Reset password");
+                            resetPasswordDialog.dialog("close");
 
-                                resetPasswordDialog.dialog("close");
-
-                                $('#pcs-reset-password-confirmation-window').dialog({
-                                    autoOpen: true,
-                                    modal: true,
-                                    width: 500
-                                });
-                            },
-                            error: function () {
-                                resetPasswordDialog.find('button').removeAttr('disabled');
-                                resetPasswordDialog.find('.error-message').slideDown();
-                            }
+                            $('#pcs-reset-password-confirmation-window').dialog({
+                                autoOpen: true,
+                                modal: true,
+                                width: 500
+                            });
+                            return $.Deferred().resolve();
+                        },
+                        function (containerId, error) {
+                            "use strict"
+                            clearDialog();
+                            btn.html("Reset password");
+                            resetPasswordDialog.find('.error-message').slideDown();
                         });
                     }
                 },
@@ -157,6 +235,7 @@ var PcsComponents = (function () {
         });
 
         var clearDialog = function () {
+            "use strict"
             var dialog = $('#pcs-reset-password-window');
             dialog.find('.error-message').hide();
             dialog.find('input').val('').removeClass('pcs-error');
@@ -164,42 +243,18 @@ var PcsComponents = (function () {
         };
 
         $('#pcs-reset-password').bind('click', function (e) {
+            "use strict"
             e.preventDefault();
             e.stopPropagation();
             resetPasswordDialog.dialog("open");
         });
     }
 
-
-
-
-    // Cookie management
-    var cookieName = "PCSRGAUTH";
-    function setAuthCookie() {
-        var reload = !isAuthenticated();
-        var d = new Date();
-
-        d.setTime(d.getTime() + (30 * 24 * 60 * 60 * 1000));
-        var expires = "expires=" + d.toUTCString();
-        document.cookie = cookieName + "=YES; " + expires;
-
-        if (reload)
-            window.location = _providerURL;
-    }
-
-    function expireAuthCookie() {
-        document.cookie = cookieName + "=YES; expires=Thu, 01 Jan 1970 00:00:01 UTC";
-    }
-
-    function isAuthenticated() {
-        return document.cookie.indexOf(cookieName + "=") >= 0;
-    }
-
-    /// Reset password methods
+    // Reset password methods
     var loadResetPasswordOnSuccess = function (id, content) {
-        ajaxOnSuccess(id, content);
+        _ajaxOnSuccess(id, content);
 
-        // Turn form into ajax submission
+        // Turn form into _ajax submission
         var obj = $('#' + id);
         var form = obj.find('form');
         var btn = form.find('input[type=submit]');
@@ -210,16 +265,23 @@ var PcsComponents = (function () {
 
             obj.addClass('pcs-loading');
 
-            $.ajax({
-                url: form.attr('action'),
-                method: form.attr('method'),
-                data: form.serialize(),
-                success: function (response) {
-                    loadResetPasswordOnSuccess(id, response);
-                },
-                error: function () {
-                    obj.removeClass('pcs-loading');
-                }
+            (function () {
+                    "use strict";
+                var deferred = $.Deferred();
+                var data = {
+                    "pcs_aft": form.find("#pcs_aft").val(), "Password": form.find("#Password").val(), "RepeatPassword": form.find("#RepeatPassword").val(), "ProviderID": form.find("#ProviderID").val(), "Token": form.find("#Token").val(), "Email": form.find("#Email").val(), "ReturnUrl": form.find("#ReturnURL").val()};
+                _ajax("POST", _baseURL + "/MCM/ProviderComponent2/ResetPassword", null, data, deferred);
+                return deferred.promise();
+            })()
+            .then(function (containerId, content) {
+                "use strict"
+                loadResetPasswordOnSuccess(id, content);
+                return $.Deferred().resolve();
+            },
+            function (containerId, error) {
+                "use strict"
+                obj.removeClass('pcs-loading');
+                btn.html("Failed... Click to try again")
             });
         });
     };
@@ -228,156 +290,594 @@ var PcsComponents = (function () {
         window.location = _providerURL;
     }
 
-
     // Singleton instance that exposes all the methods
     var wrapper = {
 
-        guid: function () {
+        // Helpers
+        getProviderId: function () {
             return providerId;
         },
 
-        isAuthenticated: function () {
-            return isAuthenticated();
+        getAccess: function () {
+            // Returns JSON object with permission details
+            var cached = getAccessInfoFromStorage();
+            if (cached && cached.Authenticated) {
+                console.log("FROM CACHE", cached);
+                return $.Deferred().resolve(cached);
+            }
+
+            return (function () {
+                var deferred = $.Deferred();
+                _ajax("POST", _baseURL + "/MCM/ProviderComponent2/hasAccessToCareInformation", null, null, deferred);
+                return deferred.promise();
+            })()
+                .then(function (containerId, content) {
+
+                    var info = JSON.parse(content);
+                    if (info && info.Authenticated) {
+                        setAccessInfoToStorage(info);
+                        console.log("SET TO CACHE", info);
+                    }
+                    else {
+                        setAccessInfoToStorage(null);
+                    }
+                    return $.Deferred().resolve(info);
+                });
+        },
+        loadLogin: function (containerId) {
+            // resolves to lib
+            return (function () {
+                var deferred = $.Deferred();
+                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/Login", containerId, null, deferred);
+                return deferred.promise();
+            })()
+                .then(function (containerId, content) {
+                    _ajaxOnSuccess(containerId, content);
+                    _loginOnSuccess(containerId, content);
+                    return $.Deferred().resolve(wrapper);
+                },
+                function (containerId) {
+                    _ajaxOnError(containerId);
+                    return $.Deferred().resolve(wrapper);
+                });
+        },
+        loadLoginIframe: function (containerId, afterlogincallback) {
+            // resolves to lib
+            return (function () {
+                var deferred = $.Deferred();
+
+                // message from iframe on successful login
+                window.addEventListener("message", receiveMessage, false);
+                function receiveMessage(event) {
+
+                    // Handle response
+                    console.log("Message received", event);
+                    var data = {};
+                    try {
+                        data = JSON.parse(event.data);
+                    } catch (ex) { }
+
+                    if (typeof (afterlogincallback) === "function") {
+                        afterlogincallback(data);
+                    }
+                    else if (data.authenticated === true) {
+                        window.location = window.location;
+                    }
+                }
+
+                // Add iframe to the container
+                $("#" + containerId).html('<iframe id="pcs-Login_iframe" src="' + _baseURL + "/MCM/ProviderComponent2/login/" + _providerId + '" scrolling="no"></iframe>');
+
+                // When the content is loaded...
+                $("#pcs-Login_iframe").on("load", function () {
+                    return deferred.resolve(wrapper);
+                });
+                return deferred.promise();
+            })()
+                .then(function (containerId) {
+                    //_loginOnSuccess(containerId, $(containerId).html());
+                    return $.Deferred().resolve(wrapper);
+                });
         },
 
-        loadLogin: function (containerId) {
-            ajax(_baseURL + "/MCM/ProviderComponent/login", containerId, loginOnSuccess);
+        doLogin: function (username, password, token) {
+            "use strict"
+            var deferred = $.Deferred();
+            // Basic validation
+            var errors = [];
+            if (!username || username.length < 5) {
+                errors.push({ Key: "invalidemail", Value: "Please provide a valid email address" });
+            }
+            if (!password || password.length < 5) {
+                errors.push({ Key: "invalidpassword", Value: "Please provide a valid password" });
+            }
+            if (!token || token.length < 5) {
+                errors.push({ Key: "invalidtoken", Value: "Please provide a security verification token, which can be found inside the login container" });
+            }
+
+            if (_serialize(errors).length !== 0) {
+                return deferred.resolve({ status: "error", errors: errors });
+            }
+
+            // Submit to server
+            return (function () {
+
+                var data = { username: username, password: password, pcs_aft: token};
+
+                _ajax("POST", _baseURL + "/MCM/ProviderComponent2/LoginJson", null, data, deferred);
+                return deferred.promise();
+            })()
+            .then(function (containerId, success) {
+
+                var result = JSON.parse(success);
+                if (result.authenticated === true && result.access) {
+                    setAccessInfoToStorage(result.access);
+                }
+                return $.Deferred().resolve(JSON.parse(success));
+            },
+            function (containerId, errors) {
+                return $.Deferred().resolve({ errors: [{ Key: "servererror", Value: errors ? "Error: " + errors + ". Please try refreshing the page" : "Server error, please notify the Customer Support" }] });
+            });
+        },
+
+        doLogout: function () {
+            "use strict"
+            var deferred = $.Deferred();
+
+            // Submit to server
+            return (function () {
+                _ajax("POST", _baseURL + "/MCM/ProviderComponent2/Logout", null, null, deferred);
+                return deferred.promise();
+            })().then(
+            function () {
+                setAccessInfoToStorage(null);
+                localStorage.removeItem("PCSTicket");
+                console.log("REMOVING CareInformationAccess");
+                return $.Deferred().resolve(wrapper);
+            },
+            function (containerId, errors) {
+                setAccessInfoToStorage(null);
+                localStorage.removeItem("PCSTicket");
+                console.log("REMOVING CareInformationAccess");
+                return $.Deferred().resolve(wrapper);
+            });
+        },
+
+        doChangeSU: function (suid) {
+            "use strict"
+            // Returns an object with {status = "OK|Error", errors, selectedSU}
+            var deferred = $.Deferred();
+            var data = { selectedSU: suid };
+
+            // resolves to lib
+            return (function () {
+                var deferred = $.Deferred();
+                _ajax("POST", _baseURL + "/MCM/ProviderComponent2/DoChangeSU", null, data, deferred);
+                return deferred.promise();
+            })()
+                .then(function (containerId, content) {
+
+                    var info = {};
+                    try {
+                        info = JSON.parse(content);
+                    } catch (ex) { }
+
+                    if (info && info.authenticated === true && info.access) {
+                        setAccessInfoToStorage(info.access);
+                    } else {
+                        setAccessInfoToStorage(null);
+                    }
+
+                    return $.Deferred().resolve(info);
+                });
+        },
+
+        loadChangeSU: function (containerId) {
+            "use strict"
+
+            // resolves to lib
+            return (function () {
+                var deferred = $.Deferred();
+                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/ChangeSU", containerId, null, deferred);
+                return deferred.promise();
+            })()
+                .then(function (containerId, content) {
+                    _ajaxOnSuccess(containerId, content);
+                    return $.Deferred().resolve(wrapper);
+                },
+                function (containerId) {
+                    _ajaxOnError(containerId);
+                    return $.Deferred().resolve(wrapper);
+                });
         },
 
         loadCareSummary: function (containerId) {
-            ajax(_baseURL + "/MCM/ProviderComponent/CareSummary", containerId);
+            // resolves to lib
+            return (function () {
+                var deferred = $.Deferred();
+                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/CareSummary", containerId, null, deferred);
+                return deferred.promise();
+            })()
+                .then(function (containerId, content) {
+                    _ajaxOnSuccess(containerId, content);
+                    return $.Deferred().resolve(wrapper);
+                },
+                function (containerId) {
+                    _ajaxOnError(containerId);
+                    return $.Deferred().resolve(wrapper);
+                });
         },
 
         loadDailyPlan: function (containerId) {
-            ajax(_baseURL + "/MCM/ProviderComponent/DailyPlan", containerId);
+            // resolves to lib
+            return (function () {
+                var deferred = $.Deferred();
+                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/DailyPlan", containerId, null, deferred);
+                return deferred.promise();
+            })()
+                .then(function (containerId, content) {
+                    _ajaxOnSuccess(containerId, content);
+                    return $.Deferred().resolve(wrapper);
+                },
+                function (containerId) {
+                    _ajaxOnError(containerId);
+                    return $.Deferred().resolve(wrapper);
+                });
         },
 
         loadDailyCare: function (containerId) {
-            ajax(_baseURL + "/MCM/ProviderComponent/DailyCare", containerId);
+            // resolves to lib
+            return (function () {
+                var deferred = $.Deferred();
+                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/DailyCare", containerId, null, deferred);
+                return deferred.promise();
+            })()
+                .then(function (containerId, content) {
+                    _ajaxOnSuccess(containerId, content);
+                    return $.Deferred().resolve(wrapper);
+                },
+                function (containerId) {
+                    _ajaxOnError(containerId);
+                    return $.Deferred().resolve(wrapper);
+                });
+        },
+
+        loadCareNotesStory: function (containerId) {
+            // resolves to lib
+            return (function () {
+                var deferred = $.Deferred();
+                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/CareNotesStory", containerId, null, deferred);
+                return deferred.promise();
+            })()
+                .then(function (containerId, content) {
+                    _ajaxOnSuccess(containerId, content);
+                    return $.Deferred().resolve(wrapper);
+                },
+                    function (containerId) {
+                        _ajaxOnError(containerId);
+                        return $.Deferred().resolve(wrapper);
+                    });
+        },
+
+        loadCareNotesChart: function (containerId) {
+            // resolves to lib
+            return (function () {
+                var deferred = $.Deferred();
+                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/CareNotesChart", containerId, { adls: getAdlPref()}, deferred);
+                return deferred.promise();
+            })()
+                .then(function (containerId, content) {
+                    _ajaxOnSuccess(containerId, content);
+
+                    // Hook up to ADL change
+                    $("#" + containerId).find("#adl-header").click(function () {
+                        $("#" + containerId).find("#adl-selector").toggle();
+                    })
+                    $("#" + containerId).find("#adl-selector span.adl-option").click(function () {
+                        var $o = $(this);
+                        if ($o.hasClass("selected"))
+                            $o.removeClass("selected");
+                        else
+                            $o.addClass("selected");
+                    })
+                    $("#" + containerId).find("#adl-selector span.pcs-button").click(function () {
+                        var selected = [];
+
+                        $("#" + containerId).find("#adl-selector span.adl-option.selected").each(function (i, o) {
+                            selected.push($(o).data("adlid"));
+                        });
+                        saveAdlPref(selected);
+                        wrapper.loadCareNotesChart(containerId);
+                    })
+
+                    return $.Deferred().resolve(wrapper);
+                },
+                function (containerId) {
+                    _ajaxOnError(containerId);
+                    return $.Deferred().resolve(wrapper);
+                });
+
+            function getAdlPref() {
+                var o = localStorage.getItem("adlfilters");
+                if (!o || o.length === 0)
+                    return [-999];
+                return o.split(',');
+            }
+            function saveAdlPref(pref) {
+                if (!pref || pref.length === 0) localStorage.removeItem("adlfilters");
+                else localStorage.setItem("adlfilters", pref.join(','));
+            }
         },
 
         loadActivitiesChart: function (containerId) {
-            ajax(_baseURL + "/MCM/ProviderComponent/ActivitiesChart", containerId);
+            // resolves to lib
+            return (function () {
+                var deferred = $.Deferred();
+                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/ActivitiesChart", containerId, null, deferred);
+                return deferred.promise();
+            })()
+                .then(function (containerId, content) {
+                    _ajaxOnSuccess(containerId, content);
+                    return $.Deferred().resolve(wrapper);
+                },
+                function (containerId) {
+                    _ajaxOnError(containerId);
+                    return $.Deferred().resolve(wrapper);
+                });
         },
 
         loadHygieneChart: function (containerId) {
-            ajax(_baseURL + "/MCM/ProviderComponent/HygieneChart", containerId);
+            // resolves to lib
+            return (function () {
+                var deferred = $.Deferred();
+                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/HygieneChart", containerId, null, deferred);
+                return deferred.promise();
+            })()
+                .then(function (containerId, content) {
+                    _ajaxOnSuccess(containerId, content);
+                    return $.Deferred().resolve(wrapper);
+                },
+                function (containerId) {
+                    _ajaxOnError(containerId);
+                    return $.Deferred().resolve(wrapper);
+                });
         },
 
         loadFluidChart: function (containerId) {
-            ajax(_baseURL + "/MCM/ProviderComponent/FluidChart", containerId);
+            // resolves to lib
+            return (function () {
+                var deferred = $.Deferred();
+                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/FluidChart", containerId, null, deferred);
+                return deferred.promise();
+            })()
+                .then(function (containerId, content) {
+                    _ajaxOnSuccess(containerId, content);
+                    return $.Deferred().resolve(wrapper);
+                },
+                function (containerId) {
+                    _ajaxOnError(containerId);
+                    return $.Deferred().resolve(wrapper);
+                });
         },
 
         loadCareHoursPerAdl: function (containerId) {
-            if (typeof (kendo) == "undefined") {
-                $LAB
-                    .script({ src: _baseURL + "/MCM/scripts/" + "Kendo.2017.3.1018/kendo.web.min.js", type: "text/javascript" })
-                    .script({ src: _baseURL + "/MCM/scripts/" + "Kendo.2017.3.1018/kendo.dataviz.min.js", type: "text/javascript" })
-                    .script({ src: _baseURL + "/MCM/scripts/" + "Kendo.2017.3.1018/kendo.aspnetmvc.min.js", type: "text/javascript" })
+            // resolves to lib
+            if (typeof (kendo) === "undefined") {
+                return $LAB
+                    .script({ src: _contentURL + "/MCM/scripts/" + "Kendo.2017.3.1018/kendo.web.min.js", type: "text/javascript" })
+                    .script({ src: _contentURL + "/MCM/scripts/" + "Kendo.2017.3.1018/kendo.dataviz.min.js", type: "text/javascript" })
+                    .script({ src: _contentURL + "/MCM/scripts/" + "Kendo.2017.3.1018/kendo.aspnetmvc.min.js", type: "text/javascript" })
                     .wait(function () {
-                        ajax(_baseURL + "/MCM/ProviderComponent/CareHoursPerAdl", containerId);
+                        return _load();
 
                     });
 
             }
             else {
-                ajax(_baseURL + "/MCM/ProviderComponent/CareHoursPerAdl", containerId);
+                return _load();
+            }
+
+            function _load() {
+                return (function () {
+                    var deferred = $.Deferred();
+                    _ajax("GET", _baseURL + "/MCM/ProviderComponent2/CareHoursPerAdl", containerId, null, deferred);
+                    return deferred.promise();
+                })()
+                    .then(function (containerId, content) {
+                        _ajaxOnSuccess(containerId, content);
+                        return $.Deferred().resolve(wrapper);
+                    },
+                    function (containerId) {
+                        _ajaxOnError(containerId);
+                        return $.Deferred().resolve(wrapper);
+                    });
             }
         },
 
         loadCareNotesPerDay: function (containerId) {
-            if (typeof (kendo) == "undefined") {
-                $LAB
-                    .script({ src: _baseURL + "/MCM/scripts/" + "Kendo.2017.3.1018/kendo.web.min.js", type: "text/javascript" })
-                    .script({ src: _baseURL + "/MCM/scripts/" + "Kendo.2017.3.1018/kendo.dataviz.min.js", type: "text/javascript" })
-                    .script({ src: _baseURL + "/MCM/scripts/" + "Kendo.2017.3.1018/kendo.aspnetmvc.min.js", type: "text/javascript" })
+            // resolves to lib
+            if (typeof (kendo) === "undefined") {
+                return $LAB
+                    .script({ src: _contentURL + "/MCM/scripts/" + "Kendo.2017.3.1018/kendo.web.min.js", type: "text/javascript" })
+                    .script({ src: _contentURL + "/MCM/scripts/" + "Kendo.2017.3.1018/kendo.dataviz.min.js", type: "text/javascript" })
+                    .script({ src: _contentURL + "/MCM/scripts/" + "Kendo.2017.3.1018/kendo.aspnetmvc.min.js", type: "text/javascript" })
                     .wait(function () {
-                        ajax(_baseURL + "/MCM/ProviderComponent/CareNotesPerDay", containerId);
+                        return _load();
+                    });
 
-                      });
-
-                    }
+            }
             else {
-                ajax(_baseURL + "/MCM/ProviderComponent/CareNotesPerDay", containerId);
-                }
+                return _load();
+            }
+
+            function _load() {
+                return (function () {
+                    var deferred = $.Deferred();
+                    _ajax("GET", _baseURL + "/MCM/ProviderComponent2/CareNotesPerDay", containerId, null, deferred);
+                    return deferred.promise();
+                })()
+                    .then(function (containerId, content) {
+                        _ajaxOnSuccess(containerId, content);
+                        return $.Deferred().resolve(wrapper);
+                    },
+                    function (containerId) {
+                        _ajaxOnError(containerId);
+                        return $.Deferred().resolve(wrapper);
+                    });
+            }
         },
 
         loadPortrait: function (containerId) {
-            ajax(_baseURL + "/MCM/ProviderComponent/Portrait", containerId);
+            // resolves to lib
+            return (function () {
+                var deferred = $.Deferred();
+                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/Portrait", containerId, null, deferred);
+                return deferred.promise();
+            })()
+                .then(function (containerId, content) {
+                    _ajaxOnSuccess(containerId, content);
+                    return $.Deferred().resolve(wrapper);
+                },
+                function (containerId) {
+                    _ajaxOnError(containerId);
+                    return $.Deferred().resolve(wrapper);
+                });
         },
 
         loadHappiness: function (containerId) {
-            ajax(_baseURL + "/MCM/ProviderComponent/Happiness", containerId);
+            // resolves to lib
+            return (function () {
+                var deferred = $.Deferred();
+                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/Happiness", containerId, null, deferred);
+                return deferred.promise();
+            })()
+                .then(function (containerId, content) {
+                    _ajaxOnSuccess(containerId, content);
+                    return $.Deferred().resolve(wrapper);
+                },
+                function (containerId) {
+                    _ajaxOnError(containerId);
+                    return $.Deferred().resolve(wrapper);
+                });
         },
 
         loadCompleteCarePlanDocument: function (containerId) {
-            var url = _baseURL + '/MCM/ProviderComponent/CompleteCarePlanDocument/' + guid;
+            "use strict"
+            // Opens a new tab
+            var ticket = getTicketFromStorage() || "noticket";
+            var url = _baseURL + '/MCM/ProviderComponent2/CompleteCarePlanDocument/' + _providerId + '?ticket=' + ticket;
             window.open(url, '_blank');
         },
 
         loadMessenger: function (containerId) {
-            $LAB.setOptions({AllowDuplicates:false})
-                    .script({ src: _baseURL + "/MCM/scripts/" + "Kendo.2017.3.1018/kendo.web.min.js", type: "text/javascript" })
-                    .script({ src: _baseURL + "/MCM/scripts/" + "Kendo.2017.3.1018/kendo.aspnetmvc.min.js", type: "text/javascript" })
-                    .script({ src: _baseURL + "/MCM/scripts/" + "PhotoSwipe/4.0.7/photoswipe.min.js", type: "text/javascript" })
-                    .script({ src: _baseURL + "/MCM/scripts/" + "PhotoSwipe/4.0.7/photoswipe-ui-default.min.js", type: "text/javascript" })
-                    .script({ src: _baseURL + "/MCM/scripts/" + "PhotoSwipe/GalleryLoader.js", type: "text/javascript" })
-                    .script({ src: _baseURL + "/MCM/scripts/" + "PicEdit/js/picedit.js", type: "text/javascript" })
-                    .wait(function () {
-                        ajax(_baseURL + "/MCM/ProviderComponent/Messenger", containerId);
-                    });
+            "use strict"
+            // resolves to lib
+            $LAB.setOptions({ AllowDuplicates: false })
+                .script({ src: _contentURL + "/MCM/scripts/" + "Kendo.2017.3.1018/kendo.web.min.js", type: "text/javascript" })
+                .script({ src: _contentURL + "/MCM/scripts/" + "Kendo.2017.3.1018/kendo.aspnetmvc.min.js", type: "text/javascript" })
+                .script({ src: _contentURL + "/MCM/scripts/" + "PhotoSwipe/4.0.7/photoswipe.min.js", type: "text/javascript" })
+                .script({ src: _contentURL + "/MCM/scripts/" + "PhotoSwipe/4.0.7/photoswipe-ui-default.min.js", type: "text/javascript" })
+                .script({ src: _contentURL + "/MCM/scripts/" + "PhotoSwipe/GalleryLoader.js", type: "text/javascript" })
+                .script({ src: _contentURL + "/MCM/scripts/" + "PicEdit/js/picedit.js", type: "text/javascript" })
+                .wait(function () {
+                    (function () {
+                        var deferred = $.Deferred();
+                        _ajax("GET", _baseURL + "/MCM/ProviderComponent2/Messenger", containerId, null, deferred);
+                        return deferred.promise();
+                    })()
+                        .then(function (containerId, content) {
+                            _ajaxOnSuccess(containerId, content);
+
+                            // Set messages as Read in the storage
+                            var access = getAccessInfoFromStorage();
+                            if (access) {
+                                access.UnreadMessages = false;
+                                setAccessInfoToStorage(access);
+                            }
+
+                            return $.Deferred().resolve(wrapper);
+                        },
+                        function (containerId) {
+                            _ajaxOnError(containerId);
+                            return $.Deferred().resolve(wrapper);
+                        });
+                });
         },
 
         loadGallery: function (containerId) {
+            "use strict";
+            // resolves to lib
             $LAB.setOptions({ AllowDuplicates: false })
-                    .script({ src: _baseURL + "/MCM/scripts/" + "Kendo.2017.3.1018/kendo.web.min.js", type: "text/javascript" })
-                    .script({ src: _baseURL + "/MCM/scripts/" + "Kendo.2017.3.1018/kendo.aspnetmvc.min.js", type: "text/javascript" })
-                    .script({ src: _baseURL + "/MCM/scripts/" + "PhotoSwipe/4.0.7/photoswipe.min.js", type: "text/javascript" })
-                    .script({ src: _baseURL + "/MCM/scripts/" + "PhotoSwipe/4.0.7/photoswipe-ui-default.min.js", type: "text/javascript" })
-                    .script({ src: _baseURL + "/MCM/scripts/" + "PhotoSwipe/GalleryLoader.js", type: "text/javascript" })
-                    .script({ src: _baseURL + "/MCM/scripts/" + "PicEdit/js/picedit.js", type: "text/javascript" })
-                    .wait(function () {
-                        ajax(_baseURL + "/MCM/ProviderComponent/Gallery", containerId);
-                    });
-        },
+                .script({ src: _contentURL + "/MCM/scripts/" + "Kendo.2017.3.1018/kendo.web.min.js", type: "text/javascript" })
+                .script({ src: _contentURL + "/MCM/scripts/" + "Kendo.2017.3.1018/kendo.aspnetmvc.min.js", type: "text/javascript" })
+                .script({ src: _contentURL + "/MCM/scripts/" + "PhotoSwipe/4.0.7/photoswipe.min.js", type: "text/javascript" })
+                .script({ src: _contentURL + "/MCM/scripts/" + "PhotoSwipe/4.0.7/photoswipe-ui-default.min.js", type: "text/javascript" })
+                .script({ src: _contentURL + "/MCM/scripts/" + "PhotoSwipe/GalleryLoader.js", type: "text/javascript" })
+                .script({ src: _contentURL + "/MCM/scripts/" + "PicEdit/js/picedit.js", type: "text/javascript" })
+                .wait(function () {
 
-        hasCareInformationAccess: function (callback) {
-            ajax(_baseURL + "/MCM/ProviderComponent/hasAccessToCareInformation", "",
-                function (id, content) { callback(JSON.parse(content)); },
-                function () { callback(false); }
-                );
+                    (function () {
+                        var deferred = $.Deferred();
+                        _ajax("GET", _baseURL + "/MCM/ProviderComponent2/Gallery", containerId, null, deferred);
+                        return deferred.promise();
+                    })()
+                        .then(function (containerId, content) {
+                            _ajaxOnSuccess(containerId, content);
+                            return $.Deferred().resolve(wrapper);
+                        },
+                        function (containerId) {
+                            _ajaxOnError(containerId);
+                            return $.Deferred().resolve(wrapper);
+                        });
+                });
         },
 
         loadResetPassword: function (containerId) {
+            "use strict";
+            // resolves to lib
+            var token = "";
             var query = window.location.search.substring(1);
-
-            if (query.indexOf("token=") !== false) {
-                var urlParams = query.split("&");
-                for (var i in urlParams) {
-                    if (urlParams[i].indexOf("token=") !== 0) continue;
-
-                    ajax(_baseURL + "/MCM/ProviderComponent/ResetPassword", containerId, loadResetPasswordOnSuccess, loadResetPasswordOnError, "?" + urlParams[i] + "&returnurl=" + escape(_providerURL));
-                    return;
-                }
-                window.location = _providerURL;
+            var parts = query.split("&");
+            for (var i = 0; i < parts.length; i++) {
+                if (parts[i].indexOf("token=") !== 0) continue;
+                token = parts[i].split("=")[1];
+                break;
             }
-        }
+            if (token == "") {
+                loadResetPasswordOnError(containerId);
+                return $.Deferred().resolve(wrapper);
+            }
 
+            // resolves to lib
+            return (function () {
+                var deferred = $.Deferred();
+
+                var data = { token: token, returnurl: _providerURL };
+                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/ResetPassword", containerId, data, deferred);
+                return deferred.promise();
+            })()
+                .then(function (containerId, content) {
+                    loadResetPasswordOnSuccess(containerId, content);
+                    return $.Deferred().resolve(wrapper);
+                },
+                function (containerId, error) {
+                    loadResetPasswordOnError(containerId);
+                    return $.Deferred().resolve(wrapper);
+                });
+        },
     }
 
     return {
-        getInstance: function (providerId) {
-            if (providerId === undefined || providerId.length !== 36)
-                throw new Exception('Provider ID is required');
+        getInstance: function () {
+            if (_providerId === undefined || _providerId.length !== 36)
+                throw 'PcsComponents has not been initialised with the provider ID';
 
-            guid = providerId;
-
-            if (initialised == false) {
+            if (initialised === false) {
                 // Load kendo libraries and css - method recommended by Google/PageSpeed
                 initialised = true;
 
                 $.ajax({
-                    url: _baseURL + "/MCM/scripts/LAB.min.js",
+                    url: _contentURL + "/MCM/scripts/LAB.min.js",
                     dataType: "script",
                     cache: true,
                     success: function () {
@@ -388,7 +888,12 @@ var PcsComponents = (function () {
             //console.log("Returning promise of wrapper");
             return deferred.promise(wrapper);
         },
-        config: function (obj) {
+        init: function (obj) {
+
+            if (!obj.providerId)
+                throw "Provider id must be specified during initialisation";
+            _providerId = obj.providerId;
+
             // You should never need to change this URL unless you're running in the development/testing environment
             if (obj.baseURL) {
                 _baseURL = obj.baseURL;
@@ -404,5 +909,4 @@ var PcsComponents = (function () {
             }
         }
     };
-
 })();
