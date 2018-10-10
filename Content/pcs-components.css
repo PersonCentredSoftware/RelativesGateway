@@ -1,4 +1,4 @@
-﻿/* 
+/* 
 PersonCentredSoftware Limited 
 */
 
@@ -109,16 +109,13 @@ PersonCentredSoftware Limited
 }
 
 .pcs-loading {
-    background: url('https://care.personcentredsoftware.com/MCM/Images/loading.gif') center no-repeat;
+    background: url('https://staticcontent.personcentredsoftware.com/MCM/Images/loading.gif') center no-repeat;
     min-height: 30px;
+    width: 100%;
 }
 
 /* Login form component */
 @media (min-width: 768px) {
-    .pcs-component.pcs-Login {
-        float: right;
-        display: inline-block;
-    }
 
     .pcs-component.pcs-Login .pcs-form-item {
         display: inline-block;
