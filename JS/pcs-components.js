@@ -1,7 +1,7 @@
 /* 
     Person Centred Software Limited
     https://github.com/PersonCentredSoftware/RelativesGateway
-    Version 1.0.0
+    Version 1.0.1
 */
 
 var PcsComponents = (function () {
@@ -17,7 +17,6 @@ var PcsComponents = (function () {
     function _ajax(method, url, containerId, urlData, deferred) {
 
         var xmlhttp = new XMLHttpRequest();
-        xmlhttp.withCredentials = true;
 
         xmlhttp.onreadystatechange = function () {
             if (xmlhttp.readyState === 4) {
