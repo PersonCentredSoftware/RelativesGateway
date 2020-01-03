@@ -1,7 +1,7 @@
 /* 
     Person Centred Software Limited
     https://github.com/PersonCentredSoftware/RelativesGateway
-    Version 1.0.1
+    Version 1.0.2
 */
 
 var PcsComponents = (function () {
@@ -199,7 +199,7 @@ var PcsComponents = (function () {
                         (function () {
                             "use strict";
                             var deferred = $.Deferred();
-                            var data = { email: email, successReturnUrl: passwordResetURL, pcs_aft: $('#' + id).find("#pcs_aft").val() };
+                            var data = { email: email, successReturnUrl: passwordResetURL, pcs_aft: $('#' + id).find("#pcs_aft").val(), selectedId: window.localStorage.getItem("suid") };
                             _ajax("POST", _baseURL + "/MCM/ProviderComponent2/RegeneratePassword", null, data, deferred);
                             return deferred.promise();
                         })()
@@ -307,7 +307,7 @@ var PcsComponents = (function () {
 
             return (function () {
                 var deferred = $.Deferred();
-                _ajax("POST", _baseURL + "/MCM/ProviderComponent2/hasAccessToCareInformation", null, null, deferred);
+                _ajax("POST", _baseURL + "/MCM/ProviderComponent2/hasAccessToCareInformation", null, { selectedId: window.localStorage.getItem("suid") }, deferred);
                 return deferred.promise();
             })()
                 .then(function (containerId, content) {
@@ -425,18 +425,21 @@ var PcsComponents = (function () {
 
             // Submit to server
             return (function () {
+                localStorage.removeItem("suid");
                 _ajax("POST", _baseURL + "/MCM/ProviderComponent2/Logout", null, null, deferred);
                 return deferred.promise();
             })().then(
             function () {
                 setAccessInfoToStorage(null);
-                localStorage.removeItem("PCSTicket");
+                    localStorage.removeItem("PCSTicket");
+                    localStorage.removeItem("suid");
                 console.log("REMOVING CareInformationAccess");
                 return $.Deferred().resolve(wrapper);
             },
             function (containerId, errors) {
                 setAccessInfoToStorage(null);
                 localStorage.removeItem("PCSTicket");
+                localStorage.removeItem("suid");
                 console.log("REMOVING CareInformationAccess");
                 return $.Deferred().resolve(wrapper);
             });
@@ -447,6 +450,8 @@ var PcsComponents = (function () {
             // Returns an object with {status = "OK|Error", errors, selectedSU}
             var deferred = $.Deferred();
             var data = { selectedSU: suid };
+
+            window.localStorage.setItem("suid", suid);
 
             // resolves to lib
             return (function () {
@@ -477,7 +482,7 @@ var PcsComponents = (function () {
             // resolves to lib
             return (function () {
                 var deferred = $.Deferred();
-                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/ChangeSU", containerId, null, deferred);
+                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/ChangeSU", containerId, { selectedId: window.localStorage.getItem("suid") }, deferred);
                 return deferred.promise();
             })()
                 .then(function (containerId, content) {
@@ -494,7 +499,7 @@ var PcsComponents = (function () {
             // resolves to lib
             return (function () {
                 var deferred = $.Deferred();
-                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/CareSummary", containerId, null, deferred);
+                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/CareSummary", containerId, { selectedId: window.localStorage.getItem("suid") }, deferred);
                 return deferred.promise();
             })()
                 .then(function (containerId, content) {
@@ -511,7 +516,7 @@ var PcsComponents = (function () {
             // resolves to lib
             return (function () {
                 var deferred = $.Deferred();
-                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/DailyPlan", containerId, null, deferred);
+                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/DailyPlan", containerId, { selectedId: window.localStorage.getItem("suid") }, deferred);
                 return deferred.promise();
             })()
                 .then(function (containerId, content) {
@@ -528,7 +533,7 @@ var PcsComponents = (function () {
             // resolves to lib
             return (function () {
                 var deferred = $.Deferred();
-                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/DailyCare", containerId, null, deferred);
+                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/DailyCare", containerId, { selectedId: window.localStorage.getItem("suid") }, deferred);
                 return deferred.promise();
             })()
                 .then(function (containerId, content) {
@@ -545,7 +550,7 @@ var PcsComponents = (function () {
             // resolves to lib
             return (function () {
                 var deferred = $.Deferred();
-                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/CareNotesStory", containerId, null, deferred);
+                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/CareNotesStory", containerId, { selectedId: window.localStorage.getItem("suid") }, deferred);
                 return deferred.promise();
             })()
                 .then(function (containerId, content) {
@@ -562,7 +567,7 @@ var PcsComponents = (function () {
             // resolves to lib
             return (function () {
                 var deferred = $.Deferred();
-                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/CareNotesChart", containerId, { adls: getAdlPref()}, deferred);
+                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/CareNotesChart", containerId, { adls: getAdlPref(), selectedId: window.localStorage.getItem("suid") }, deferred);
                 return deferred.promise();
             })()
                 .then(function (containerId, content) {
@@ -612,7 +617,7 @@ var PcsComponents = (function () {
             // resolves to lib
             return (function () {
                 var deferred = $.Deferred();
-                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/ActivitiesChart", containerId, null, deferred);
+                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/ActivitiesChart", containerId, { selectedId: window.localStorage.getItem("suid") }, deferred);
                 return deferred.promise();
             })()
                 .then(function (containerId, content) {
@@ -629,7 +634,7 @@ var PcsComponents = (function () {
             // resolves to lib
             return (function () {
                 var deferred = $.Deferred();
-                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/HygieneChart", containerId, null, deferred);
+                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/HygieneChart", containerId, { selectedId: window.localStorage.getItem("suid") }, deferred);
                 return deferred.promise();
             })()
                 .then(function (containerId, content) {
@@ -646,7 +651,7 @@ var PcsComponents = (function () {
             // resolves to lib
             return (function () {
                 var deferred = $.Deferred();
-                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/FluidChart", containerId, null, deferred);
+                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/FluidChart", containerId, { selectedId: window.localStorage.getItem("suid") }, deferred);
                 return deferred.promise();
             })()
                 .then(function (containerId, content) {
@@ -679,7 +684,7 @@ var PcsComponents = (function () {
             function _load() {
                 return (function () {
                     var deferred = $.Deferred();
-                    _ajax("GET", _baseURL + "/MCM/ProviderComponent2/CareHoursPerAdl", containerId, null, deferred);
+                    _ajax("GET", _baseURL + "/MCM/ProviderComponent2/CareHoursPerAdl", containerId, { selectedId: window.localStorage.getItem("suid") }, deferred);
                     return deferred.promise();
                 })()
                     .then(function (containerId, content) {
@@ -712,7 +717,7 @@ var PcsComponents = (function () {
             function _load() {
                 return (function () {
                     var deferred = $.Deferred();
-                    _ajax("GET", _baseURL + "/MCM/ProviderComponent2/CareNotesPerDay", containerId, null, deferred);
+                    _ajax("GET", _baseURL + "/MCM/ProviderComponent2/CareNotesPerDay", containerId, { selectedId: window.localStorage.getItem("suid") }, deferred);
                     return deferred.promise();
                 })()
                     .then(function (containerId, content) {
@@ -730,7 +735,7 @@ var PcsComponents = (function () {
             // resolves to lib
             return (function () {
                 var deferred = $.Deferred();
-                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/Portrait", containerId, null, deferred);
+                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/Portrait", containerId, { selectedId: window.localStorage.getItem("suid") }, deferred);
                 return deferred.promise();
             })()
                 .then(function (containerId, content) {
@@ -747,7 +752,7 @@ var PcsComponents = (function () {
             // resolves to lib
             return (function () {
                 var deferred = $.Deferred();
-                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/Happiness", containerId, null, deferred);
+                _ajax("GET", _baseURL + "/MCM/ProviderComponent2/Happiness", containerId, { selectedId: window.localStorage.getItem("suid") }, deferred);
                 return deferred.promise();
             })()
                 .then(function (containerId, content) {
@@ -781,7 +786,7 @@ var PcsComponents = (function () {
                 .wait(function () {
                     (function () {
                         var deferred = $.Deferred();
-                        _ajax("GET", _baseURL + "/MCM/ProviderComponent2/Messenger", containerId, null, deferred);
+                        _ajax("GET", _baseURL + "/MCM/ProviderComponent2/Messenger", containerId, { selectedId: window.localStorage.getItem("suid") }, deferred);
                         return deferred.promise();
                     })()
                         .then(function (containerId, content) {
@@ -817,7 +822,7 @@ var PcsComponents = (function () {
 
                     (function () {
                         var deferred = $.Deferred();
-                        _ajax("GET", _baseURL + "/MCM/ProviderComponent2/Gallery", containerId, null, deferred);
+                        _ajax("GET", _baseURL + "/MCM/ProviderComponent2/Gallery", containerId, { selectedId: window.localStorage.getItem("suid") }, deferred);
                         return deferred.promise();
                     })()
                         .then(function (containerId, content) {
@@ -835,14 +840,16 @@ var PcsComponents = (function () {
             "use strict";
             // resolves to lib
             var token = "";
+            var uid = "";
             var query = window.location.search.substring(1);
             var parts = query.split("&");
             for (var i = 0; i < parts.length; i++) {
-                if (parts[i].indexOf("token=") !== 0) continue;
-                token = parts[i].split("=")[1];
-                break;
+                if (parts[i].indexOf("token=") == 0)
+                    token = parts[i].split("=")[1];
+                if (parts[i].indexOf("uid=") == 0)
+                    uid = parts[i].split("=")[1];
             }
-            if (token == "") {
+            if (token == "" || uid == "") {
                 loadResetPasswordOnError(containerId);
                 return $.Deferred().resolve(wrapper);
             }
@@ -851,7 +858,7 @@ var PcsComponents = (function () {
             return (function () {
                 var deferred = $.Deferred();
 
-                var data = { token: token, returnurl: _providerURL };
+                var data = { uid: uid, token: token, returnurl: _providerURL, selectedId: window.localStorage.getItem("suid") };
                 _ajax("GET", _baseURL + "/MCM/ProviderComponent2/ResetPassword", containerId, data, deferred);
                 return deferred.promise();
             })()
